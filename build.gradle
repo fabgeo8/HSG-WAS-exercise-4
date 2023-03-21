@@ -24,7 +24,7 @@ repositories {
     maven { url "https://repo.gradle.org/gradle/libs-releases" }
 }
 
-dependencies {
+dependencies { 
     implementation('org.jacamo:jacamo:1.1')
 }
 

@@ -4,6 +4,13 @@ import cartago.Artifact;
 import cartago.OPERATION;
 import cartago.OpFeedbackParam;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.net.http.HttpRequest;
+
 /**
  * A CArtAgO artifact that agent can use to interact with LDP containers in a Solid pod.
  */
@@ -28,8 +35,45 @@ public class Pod extends Artifact {
    * 
    */
     @OPERATION
-    public void createContainer(String containerName) {
-        log("1. Implement the method createContainer()");
+    public void createContainer(String containerName) {   
+            if (resourceExists("https://solid.interactions.ics.unisg.ch/fabiog/" + containerName)) {
+                // container already exists, no need to create
+                return;
+            }
+            
+            // create request body in turtle syntax, according to https://www.w3.org/TR/ldp-primer/#creating-containers-and-structural-hierarchy 2.3
+            String containerDescription = "Container created by agents";
+            String content = "@prefix ldp: <http://www.w3.org/ns/ldp#>.\n"+
+            "@prefix dcterms: <http://purl.org/dc/terms/>.\n" +
+            "<> a ldp:Container, ldp:BasicContainer, ldp:Resource;\n" +
+            "dcterms:title \"" + containerName + "\";\n" +
+            "dcterms:description \"" + containerDescription + "\" .";
+
+            HttpClient client = HttpClient.newHttpClient();
+            String url = "https://solid.interactions.ics.unisg.ch/fabiog/";
+            String contentType = "text/turtle";
+            String linkHeader = "<http://www.w3.org/ns/ldp/BasicContainer>; rel=\"type\"";
+            String slugHeader = containerName + "/";
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .POST(HttpRequest.BodyPublishers.ofString(content, StandardCharsets.UTF_8))
+                .header("Content-Type", contentType)
+                .header("Link", linkHeader)
+                .header("Slug", slugHeader)
+                .build();
+            try {
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                log(response.body());
+        
+                if(response.statusCode() == 201) {
+                    log("Container created");
+                } else {
+                    log("Error while creating container: " + response.body());
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
     }
 
   /**
@@ -41,7 +85,45 @@ public class Pod extends Artifact {
    */
     @OPERATION
     public void publishData(String containerName, String fileName, Object[] data) {
-        log("2. Implement the method publishData()");
+        String content = String.join("\n", Arrays.stream(data).toArray(String[]::new));
+        // content = createStringFromArray(data);
+
+        HttpClient client = HttpClient.newHttpClient();
+        String url = "https://solid.interactions.ics.unisg.ch/fabiog/" + containerName + "/" + fileName;
+
+        String contentType = "text/plain";
+
+        HttpRequest request;
+
+        // check if file already exists, if the file exists write to file with PUT, otherwise create the file with POST
+        if (resourceExists(url)) {
+            request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .PUT(HttpRequest.BodyPublishers.ofString(content, StandardCharsets.UTF_8))
+            .header("Content-Type", contentType)
+            .build();
+        } else {
+            url = "https://solid.interactions.ics.unisg.ch/fabiog/" + containerName;
+            request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .POST(HttpRequest.BodyPublishers.ofString(content, StandardCharsets.UTF_8))
+            .header("Content-Type", contentType)
+            .build();
+        }
+
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            log(response.body());
+    
+            if(response.statusCode() == 200 || response.statusCode() == 201) {
+                log("File writing successful");
+            } else {
+                log("Error while writing file: " + response.body());
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
   /**
@@ -64,23 +146,51 @@ public class Pod extends Artifact {
    * @return An array whose elements are the data read from the .txt file
    */
     public Object[] readData(String containerName, String fileName) {
-        log("3. Implement the method readData(). Currently, the method returns mock data");
+        HttpClient client = HttpClient.newHttpClient();
+        String url = "https://solid.interactions.ics.unisg.ch/fabiog/" + containerName + "/" + fileName;
+        String contentType = "text/plain";
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .GET()
+            .header("Content-Type", contentType)
+            .build();
 
-        // Remove the following mock responses once you have implemented the method
-        switch(fileName) {
-            case "watchlist.txt":
-                Object[] mockWatchlist = new Object[]{"The Matrix", "Inception", "Avengers: Endgame"};
-                return mockWatchlist;
-            case "sleep.txt":
-                Object[] mockSleepData = new Object[]{"6", "7", "5"};
-                return mockSleepData;
-            case "trail.txt":
-                Object[] mockTrailData = new Object[]{"3", "5.5", "5.5"};
-                return mockTrailData; 
-            default:
-                return new Object[0];
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+    
+            if(response.statusCode() == 200) {
+                log("Data read successfully");
+                return createArrayFromString(response.body());
+            } else {
+                log("Error while reading data: " + response.body());
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
+        return new Object[0];
+    }
+
+    private Boolean resourceExists(String resource) {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(resource))
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+    
+            if(response.statusCode() == 200) {
+                return true;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return false;
     }
 
   /**
