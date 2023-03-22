@@ -52,7 +52,7 @@ public class Pod extends Artifact {
             HttpClient client = HttpClient.newHttpClient();
             String url = "https://solid.interactions.ics.unisg.ch/fabiog/";
             String contentType = "text/turtle";
-            String linkHeader = "<http://www.w3.org/ns/ldp/BasicContainer>; rel=\"type\"";
+            String linkHeader = "<http://www.w3.org/ns/ldp#BasicContainer>; rel=\"type\"";
             String slugHeader = containerName + "/";
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -85,8 +85,8 @@ public class Pod extends Artifact {
    */
     @OPERATION
     public void publishData(String containerName, String fileName, Object[] data) {
-        String content = String.join("\n", Arrays.stream(data).toArray(String[]::new));
-        // content = createStringFromArray(data);
+        //String content = String.join("\n", Arrays.stream(data).toArray(String[]::new));
+        String content = createStringFromArray(data);
 
         HttpClient client = HttpClient.newHttpClient();
         String url = "https://solid.interactions.ics.unisg.ch/fabiog/" + containerName + "/" + fileName;
